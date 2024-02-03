@@ -28,7 +28,7 @@ export default function SquaresDetailFeature() {
     // So, ensure the queryKey includes the gamePublicKey to refetch when the address changes
   }, [gamePublicKey, gameState]);
 
-  const handleCellClick = async (rowIndex, cellIndex) => {
+  const handleCellClick = async (rowIndex: number, cellIndex: number) => {
     alert(`Cell clicked: ${rowIndex}, ${cellIndex}`);
   };
 
