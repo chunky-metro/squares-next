@@ -28,10 +28,6 @@ export default function SquaresDetailFeature() {
     // So, ensure the queryKey includes the gamePublicKey to refetch when the address changes
   }, [gamePublicKey, gameState]);
 
-  const handleCellClick = async (rowIndex: number, cellIndex: number) => {
-    alert(`Cell clicked: ${rowIndex}, ${cellIndex}`);
-  };
-
   // Ensure gameState.isLoading and gameState.data are used to conditionally render the loading state or the SquaresGrid
   if (gameState.isLoading) {
     return <div>Loading game data...</div>;
@@ -44,7 +40,7 @@ export default function SquaresDetailFeature() {
 
   return (
     <div>
-      {gameState.data ? <SquaresGrid gameState={gameState.data} handleCellClick={handleCellClick} /> : <div>No game data available.</div>}
+      {gameState ? <SquaresGrid gameState={gameState} /> : <div>No game data available.</div>}
     </div>
   );
 }
