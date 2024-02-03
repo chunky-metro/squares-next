@@ -52,7 +52,7 @@ export function useSquaresProgram() {
         });
 
         toast.success(`Game created: ${gameAccountPublicKey.toString()}`);
-        // Redirect or handle success case here
+        window.location.href = `/games/${gameAccountPublicKey.toString()}`;
       } catch (error) {
         console.error('Failed to create game:', error);
         toast.error('Failed to create game');
@@ -80,13 +80,12 @@ export function useAllGames() {
 
 
 export function useGetGameState({ game }: { game: PublicKey }) {
-  const { cluster } = useCluster();
   const { program } = useSquaresProgram();
   // Query for game state
 
   const gameState = useQuery({
-    queryKey: ['football_squares', 'fetch', { cluster, game }],
-    queryFn: () => program.account.Game.fetch(game),
+    queryKey: ['football_squares', 'fetch', game.toBase58()],
+    queryFn: () => program.account.game.fetch(game),
   });
 
   return { gameState };
