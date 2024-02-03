@@ -72,7 +72,7 @@ export function useAllGames() {
   const { program } = useSquaresProgram();
   const games = useQuery({
     queryKey: ['football_squares', 'all'],
-    queryFn: () => program.account.Game.all(),
+    queryFn: () => program.account.game.all(),
   });
 
   return { games };
