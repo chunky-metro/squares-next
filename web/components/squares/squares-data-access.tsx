@@ -88,8 +88,70 @@ export function useGetGameState({ game }: { game: PublicKey }) {
     queryFn: () => program.account.game.fetch(game),
   });
 
-  return { gameState };
+  return { gameState, refetch: gameState.refetch };
 }
+
+export function usePurchaseSquare({ game }: { game: PublicKey }) {
+  const { program } = useSquaresProgram();
+  const transactionToast = useTransactionToast();
+  const wallet = useWallet();
+
+  const buySquare = useMutation({
+    mutationKey: ['football_squares', 'buySquare', { game }],
+    mutationFn: (squareIds: Uint8Array) => {
+      console.log("Square IDs:", squareIds);
+      return program.rpc.purchaseSquare(Buffer.from(squareIds), {
+        accounts: {
+          game: game,
+          user: wallet.publicKey,
+          systemProgram: SystemProgram.programId,
+        },
+      });
+    },
+    onSuccess: (signature) => {
+      transactionToast(signature);
+    },
+    onError: (error) => {
+      console.error('Failed to buy square:', error);
+      toast.error('Failed to buy square');
+    },  });
+
+  return {
+    buySquare,
+  };
+}
+
+export function useFinalizeGame({ game }: { game: PublicKey }) {
+  const { program } = useSquaresProgram();
+  const transactionToast = useTransactionToast();
+  const wallet = useWallet();
+
+  const finalizeGame = useMutation({
+    mutationKey: ['football_squares', 'finalizeGame', { game }],
+    mutationFn: () => {
+      return program.rpc.finalizeGame({
+        accounts: {
+          game: game,
+          user: wallet.publicKey,
+          systemProgram: SystemProgram.programId,
+        },
+      });
+    },
+    onSuccess: (signature) => {
+      transactionToast(signature);
+      refetch(); // Add this line
+    },
+    onError: (error) => {
+      console.error('Failed to finalize game:', error);
+      toast.error('Failed to finalize game');
+    },
+  });
+
+  return {
+    finalizeGame,
+  };
+}
+
 
 // export function useSquaresProgramAccount({ game }: { game: PublicKey }) {
 //   // Similar to useCounterProgramAccount but for Squares

@@ -18,8 +18,8 @@ pub mod football_squares {
         game.squares = vec![
             Square {
                 owner: None,
-                x_axis: 0,
-                y_axis: 0
+                home_team_index: 0,
+                away_team_index: 0
             };
             100
         ]; // Assuming a 10x10 grid
@@ -33,7 +33,7 @@ pub mod football_squares {
 
         let total_cost = calculate_total_cost(game.cost_per_square, square_indices.len());
         let fee = calculate_fee(total_cost, 6.9);
-        let amount_to_game = total_cost - fee;
+        let amount_to_game = total_cost + fee;
 
         for &square_index in &square_indices {
             require!(square_index < 100, ErrorCode::InvalidSquareIndex);
@@ -56,44 +56,55 @@ pub mod football_squares {
             ],
         )?;
 
-        let fee_receiver_pubkey = FEE_RECEIVER_ACCOUNT.parse::<Pubkey>().unwrap();
+        // let fee_receiver_pubkey = FEE_RECEIVER_ACCOUNT.parse::<Pubkey>().unwrap();
 
-        let fee_transfer_instruction =
-            system_instruction::transfer(&ctx.accounts.user.key(), &fee_receiver_pubkey, fee);
-        invoke(
-            &fee_transfer_instruction,
-            &[
-                ctx.accounts.user.to_account_info(),
-                ctx.accounts.system_program.to_account_info(),
-            ],
-        )?;
+        // let fee_transfer_instruction =
+        //     system_instruction::transfer(&ctx.accounts.user.key(), &fee_receiver_pubkey, fee);
+        // invoke(
+        //     &fee_transfer_instruction,
+        //     &[
+        //         ctx.accounts.user.to_account_info(),
+        //         ctx.accounts.system_program.to_account_info(),
+        //     ],
+        // )?;
 
         Ok(())
     }
 
     pub fn finalize_game(ctx: Context<FinalizeGame>) -> Result<()> {
         let game = &mut ctx.accounts.game;
+        let user = &ctx.accounts.user;
+
         require!(game.game_status == GameStatus::Open, ErrorCode::GameNotOpen);
         require!(
             game.squares.iter().all(|s| s.owner.is_some()),
             ErrorCode::NotAllSquaresPurchased
         );
+        require!(game.owner == user.key(), ErrorCode::Unauthorized);
 
         // Use the current slot as the seed for randomness
         let slot = Clock::get()?.slot;
 
-        let mut x_numbers: Vec<u8> = (0..10).collect();
-        let mut y_numbers: Vec<u8> = (0..10).collect();
+        // Generate and shuffle indices for the home and away teams
+        let mut home_indices: Vec<u8> = (0..10).collect();
+        let mut away_indices: Vec<u8> = (0..10).collect();
+        shuffle(&mut home_indices, slot);
+        shuffle(&mut away_indices, slot + 1);
 
-        // Custom shuffle function using xorshift64star
-        shuffle(&mut x_numbers, slot);
-        shuffle(&mut y_numbers, slot + 1); // Use a different seed for y
+        // Assign the shuffled indices to the game
+        game.home_team_indices = home_indices;
+        game.away_team_indices = away_indices;
 
+        let home_team_indices = game.home_team_indices.clone();
+        let away_team_indices = game.away_team_indices.clone();
+
+        // Assign shuffled indices to each square
         for i in 0..10 {
             for j in 0..10 {
-                let square = &mut game.squares[i * 10 + j];
-                square.x_axis = x_numbers[i];
-                square.y_axis = y_numbers[j];
+                let square_index = i * 10 + j;
+                let square = &mut game.squares[square_index];
+                square.home_team_index = home_team_indices[i];
+                square.away_team_index = away_team_indices[j];
             }
         }
 
@@ -120,32 +131,32 @@ pub mod football_squares {
         match quarter {
             1 => {
                 scores.first_quarter_scores = QuarterScores {
-                    home: home,
-                    away: away,
+                    home: Some(home), // Wrapping with Some()
+                    away: Some(away), // Wrapping with Some()
                 }
             }
             2 => {
                 scores.second_quarter_scores = QuarterScores {
-                    home: home,
-                    away: away,
+                    home: Some(home), // Wrapping with Some()
+                    away: Some(away), // Wrapping with Some()
                 }
             }
             3 => {
                 scores.third_quarter_scores = QuarterScores {
-                    home: home,
-                    away: away,
+                    home: Some(home), // Wrapping with Some()
+                    away: Some(away), // Wrapping with Some()
                 }
             }
             4 => {
                 scores.fourth_quarter_scores = QuarterScores {
-                    home: home,
-                    away: away,
+                    home: Some(home), // Wrapping with Some()
+                    away: Some(away), // Wrapping with Some()
                 }
             }
             5 => {
                 scores.final_scores = QuarterScores {
-                    home: home,
-                    away: away,
+                    home: Some(home), // Wrapping with Some()
+                    away: Some(away), // Wrapping with Some()
                 }
             }
             _ => return Err(ErrorCode::InvalidQuarter.into()),
@@ -247,7 +258,9 @@ pub struct PurchaseSquare<'info> {
 pub struct FinalizeGame<'info> {
     #[account(mut)]
     pub game: Account<'info, Game>,
-    // Additional accounts and constraints needed for finalization
+    #[account(mut)]
+    pub user: Signer<'info>,
+    pub system_program: Program<'info, System>,
 }
 
 #[derive(Accounts)]
@@ -259,8 +272,8 @@ pub struct UpdateScores<'info> {
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct QuarterScores {
-    pub home: u8,
-    pub away: u8,
+    pub home: Option<u8>, // Updated to be nullable
+    pub away: Option<u8>, // Updated to be nullable
 }
 
 #[account]
@@ -291,9 +304,10 @@ pub struct Game {
     pub cost_per_square: u64,
     pub game_status: GameStatus,
     pub squares: Vec<Square>,
-    pub quarter_scores: [QuarterScores; 5], // Added: Scores for each quarter, including the final score
-    pub quarter_winners: [Option<Pubkey>; 5], // Added: Winner for each quarter
-    pub quarter_paid: [bool; 5], // Added: Whether the payout for each quarter has been made
+    pub home_team_indices: Vec<u8>, // Stores shuffled indices for the home team
+    pub away_team_indices: Vec<u8>, // Stores shuffled indices for the away team
+    pub quarter_scores: [Option<QuarterScores>; 5], // Updated to be nullable
+    pub quarter_winners: [Option<Pubkey>; 5], // Winner for each quarter
 }
 
 #[derive(PartialEq, Debug, Clone, Copy, AnchorSerialize, AnchorDeserialize)]
@@ -306,8 +320,8 @@ pub enum GameStatus {
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct Square {
     pub owner: Option<Pubkey>,
-    pub x_axis: u8,
-    pub y_axis: u8,
+    pub home_team_index: u8,
+    pub away_team_index: u8,
 }
 
 // #[derive(Accounts)]
@@ -382,39 +396,3 @@ fn calculate_winning_amount(game: &Account<Game>, winner: &AccountInfo) -> u64 {
     // Implement logic to calculate the amount of winnings for a given winner
     0
 }
-
-// fn determine_quarter_winner(game: &Game, quarter: u8) -> Result<Option<Pubkey>> {
-//     let quarter_index = quarter as usize;
-//     // Ensure the quarter index is within bounds
-//     if quarter_index == 0 || quarter_index > game.quarter_scores.len() {
-//         return Err(ErrorCode::InvalidQuarter.into());
-//     }
-
-//     let scores = game.quarter_scores[quarter_index - 1];
-//     let last_digit_niners = scores.niners % 10;
-//     let last_digit_chiefs = scores.chiefs % 10;
-
-//     // Iterate over squares to find the matching square
-//     for square in &game.squares {
-//         if square.x_axis == last_digit_niners && square.y_axis == last_digit_chiefs {
-//             return Ok(square.owner);
-//         }
-//     }
-
-//     // If no matching square is found, return None
-//     Ok(None)
-// }
-
-// fn mark_quarter_paid(game: &mut Game, quarter: u8) -> Result<()> {
-//     let quarter_index = quarter as usize;
-//     // Ensure the quarter index is within bounds and not already marked as paid
-//     if quarter_index == 0
-//         || quarter_index > game.quarter_paid.len()
-//         || game.quarter_paid[quarter_index - 1]
-//     {
-//         return Err(ErrorCode::QuarterAlreadyPaid.into());
-//     }
-
-//     game.quarter_paid[quarter_index - 1] = true;
-//     Ok(())
-// }
