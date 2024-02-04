@@ -147,9 +147,7 @@ export function useFinalizeGame({ game }: { game: PublicKey }) {
     },
   });
 
-  return {
-    finalizeGame,
-  };
+  return finalizeGame;
 }
 
 
