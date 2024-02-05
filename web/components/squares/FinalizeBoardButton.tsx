@@ -3,7 +3,7 @@ import React from 'react';
 const FinalizeBoardButton = ({ isCreator, finalizeGame, setFinalizeStatus }) => {
   return (
     <button 
-      className="btn btn-primary mt-4 ml-40" 
+      className="btn btn-primary mt-20" 
       disabled={!isCreator}
       onClick={() => {
         finalizeGame.mutate(null, {

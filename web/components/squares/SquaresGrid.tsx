@@ -23,10 +23,14 @@ const SquaresGrid = ({ gameState, setPurchaseStatus }) => {
     return <div>Awaiting game data...</div>;
   }
 
+  if (!wallet.publicKey) {
+    return <div>Connect your wallet to play</div>;
+  }
+
   const isBoardFilled = !gameState.data.squares.some(square => square.owner === null);
   const isCreator = gameState.data.owner.equals(wallet.publicKey);
   const isBoardFinalized = gameState.data.gameStatus.finalized;
-
+  
   const gridSize = 10;
   const gridRows = Array.from({ length: gridSize }, (_, rowIndex) => {
     const row = gameState.data.squares.slice(rowIndex * gridSize, (rowIndex + 1) * gridSize);
@@ -44,14 +48,14 @@ const SquaresGrid = ({ gameState, setPurchaseStatus }) => {
       <div className="flex justify-center items-center mb-2">
         <div className="w-10 h-10"></div>
         <div className="flex">
-          <div className="font-bold text-2xl ml-10">Home Team</div>
+          <div className="font-bold text-2xl ml-10"></div>
         </div>
       </div>
       <div className="flex">
         <div className="flex flex-col items-center">
           {/* Placeholder for "Away Team" header, adjusted position */}
           <div className="h-10"></div>
-          <div className="text-2xl font-bold mr-2">Away Team</div>
+          <div className="text-2xl font-bold mr-2"></div>
         </div>
         <div>
           {/* Placeholder row for numbers, shifted to the right */}

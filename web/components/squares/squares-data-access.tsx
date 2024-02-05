@@ -95,6 +95,7 @@ export function usePurchaseSquare({ game }: { game: PublicKey }) {
   const { program } = useSquaresProgram();
   const transactionToast = useTransactionToast();
   const wallet = useWallet();
+  const { refetch } = useGetGameState({ game });
 
   const buySquare = useMutation({
     mutationKey: ['football_squares', 'buySquare', { game }],
@@ -110,6 +111,7 @@ export function usePurchaseSquare({ game }: { game: PublicKey }) {
     },
     onSuccess: (signature) => {
       transactionToast(signature);
+      return refetch();
     },
     onError: (error) => {
       console.error('Failed to buy square:', error);
@@ -125,6 +127,7 @@ export function useFinalizeGame({ game }: { game: PublicKey }) {
   const { program } = useSquaresProgram();
   const transactionToast = useTransactionToast();
   const wallet = useWallet();
+  const { refetch } = useGetGameState({ game });
 
   const finalizeGame = useMutation({
     mutationKey: ['football_squares', 'finalizeGame', { game }],
@@ -139,7 +142,7 @@ export function useFinalizeGame({ game }: { game: PublicKey }) {
     },
     onSuccess: (signature) => {
       transactionToast(signature);
-      refetch(); // Add this line
+      return refetch(); // Add this line
     },
     onError: (error) => {
       console.error('Failed to finalize game:', error);

@@ -14,7 +14,7 @@ const BuySquaresButton = ({ selectedSquares, setSelectedSquares, gridSize, purch
           },
         });
       }}
-      className="btn btn-primary mt-4 ml-40"
+      className="btn btn-primary mt-20"
     >
       Buy Squares
     </button>
