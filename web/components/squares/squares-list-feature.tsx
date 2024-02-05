@@ -34,13 +34,14 @@ export default function SquaresListFeature() {
           </div>
         </>
       ) : (
-        <div className="max-w-4xl mx-auto">
-          <div className="hero py-[64px]">
-            <div className="hero-content text-center">
-              <WalletButton />
-            </div>
-          </div>
-        </div>
+          <AppHero
+            title="Squares"
+            subtitle={
+              'You can create a new game of Squares after you select your wallet. The state of the game is stored on-chain.'
+            }
+          >
+            <WalletButton />
+          </AppHero>
       )}
     </div>
   );

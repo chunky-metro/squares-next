@@ -8,6 +8,7 @@ import { PublicKey } from '@solana/web3.js';
 import { useGetGameState } from './squares-data-access'; // Adjust this path as necessary
 import SquaresGrid from './SquaresGrid'; // Adjust this path as necessary
 import { usePurchaseSquare, useFinalizeGame } from './squares-data-access'; // Adjust this path as necessary
+import BoxScoreHeader from './BoxScoreHeader'; // Adjust this path as necessary
 
 export default function SquaresDetailFeature() {
   const params = useParams();
@@ -49,7 +50,8 @@ export default function SquaresDetailFeature() {
   }
 
   return (
-    <div>
+    <div className="flex flex-col items-stretch">
+      <BoxScoreHeader />
       {gameState ? <SquaresGrid gameState={gameState} setPurchaseStatus={setPurchaseStatus} /> : <div>No game data available.</div>}
     </div>
   );
