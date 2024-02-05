@@ -1,10 +1,12 @@
-use anchor_lang::prelude::*;
+se anchor_lang::prelude::*;
 
+use solana_program::pubkey;
 use solana_program::{program::invoke, system_instruction};
 
 declare_id!("8B9VcQmn65FYQmWjEvmyEL2D2CiMr2oacoaQstmVuXWV");
 
 const FEE_RECEIVER_ACCOUNT: &str = "8eTKgcgBERz1MGiQALfZjkuAY6Fz79UtziNsqptPkHEd";
+const ADMIN_PUBKEY: &Pubkey = &pubkey!("3iGJM28vywNTUt5hZgHjri5LEzeRBevE75EbGY7wakJA");
 
 #[program]
 pub mod football_squares {
@@ -113,15 +115,21 @@ pub mod football_squares {
         Ok(())
     }
 
+    pub fn initialize_scores(ctx: Context<InitializeScores>) -> Result<()> {
+        let scores = &mut ctx.accounts.scores;
+        // Initialize scores with default values
+        Ok(())
+    }
+
     pub fn update_scores(
         ctx: Context<UpdateScores>,
         quarter: u8,
         home: u8,
         away: u8,
     ) -> Result<()> {
-        let contract_owner = &ctx.accounts.owner;
-        require!(
-            contract_owner.key() == ctx.accounts.owner.key(),
+        require_keys_eq!(
+            *ADMIN_PUBKEY,
+            *ctx.accounts.admin.key,
             ErrorCode::Unauthorized
         );
 
@@ -160,6 +168,21 @@ pub mod football_squares {
                 }
             }
             _ => return Err(ErrorCode::InvalidQuarter.into()),
+        }
+
+        Ok(())
+    }
+
+    pub fn calculate_winners(ctx: Context<CalculateWinners>) -> Result<()> {
+        let game = &mut ctx.accounts.game;
+        let scores = &ctx.accounts.scores;
+
+        // Ensure the game is in the correct state to calculate winners
+        require!(game.game_status == GameStatus::Open, ErrorCode::GameNotOpen);
+
+        // Update the winners for each quarter based on available scores
+        if update_quarter_winners(game, scores) {
+            game.game_status = GameStatus::GameOver;
         }
 
         Ok(())
@@ -267,7 +290,7 @@ pub struct FinalizeGame<'info> {
 pub struct UpdateScores<'info> {
     #[account(mut)]
     pub scores: Account<'info, Scores>,
-    pub owner: Signer<'info>,
+    pub admin: Signer<'info>,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -276,6 +299,14 @@ pub struct QuarterScores {
     pub away: Option<u8>, // Updated to be nullable
 }
 
+#[derive(Accounts)]
+pub struct InitializeScores<'info> {
+    #[account(init, payer = user, space = 8 + 536 + /* Fixed size for other fields */)]
+    pub scores: Account<'info, Scores>,
+    #[account(mut)]
+    pub user: Signer<'info>,
+    pub system_program: Program<'info, System>,
+}
 #[account]
 pub struct Scores {
     pub first_quarter_scores: QuarterScores,
@@ -283,6 +314,15 @@ pub struct Scores {
     pub third_quarter_scores: QuarterScores,
     pub fourth_quarter_scores: QuarterScores,
     pub final_scores: QuarterScores,
+}
+
+#[derive(Accounts)]
+pub struct CalculateWinners<'info> {
+    #[account(mut)]
+    pub game: Account<'info, Game>,
+    pub scores: Account<'info, Scores>,
+    // Ensure that only an authorized user or the game owner can calculate winners
+    pub authority: Signer<'info>,
 }
 
 // #[derive(Accounts)]
@@ -306,7 +346,7 @@ pub struct Game {
     pub squares: Vec<Square>,
     pub home_team_indices: Vec<u8>, // Stores shuffled indices for the home team
     pub away_team_indices: Vec<u8>, // Stores shuffled indices for the away team
-    pub quarter_scores: [Option<QuarterScores>; 5], // Updated to be nullable
+    pub scores_account: Pubkey,     // Reference to the Scores account
     pub quarter_winners: [Option<Pubkey>; 5], // Winner for each quarter
 }
 
@@ -315,6 +355,7 @@ pub enum GameStatus {
     Open,
     Closed,
     Finalized,
+    GameOver,
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
@@ -395,4 +436,45 @@ fn calculate_winners(game: &Account<Game>) -> Vec<Pubkey> {
 fn calculate_winning_amount(game: &Account<Game>, winner: &AccountInfo) -> u64 {
     // Implement logic to calculate the amount of winnings for a given winner
     0
+}
+
+fn update_quarter_winners(game: &mut Account<Game>, scores: &Account<Scores>) -> bool {
+    // Iterate through each quarter's scores and update the game's quarter winners accordingly
+    let quarters_scores = [
+        scores.first_quarter_scores,
+        scores.second_quarter_scores,
+        scores.third_quarter_scores,
+        scores.fourth_quarter_scores,
+        scores.final_scores, // Assuming this is how you represent the final scores
+    ];
+
+    for (quarter_index, quarter_scores) in quarters_scores.iter().enumerate() {
+        // Check if both home and away scores are available for this quarter
+        if let Some(quarter_scores) = quarter_scores {
+            // Calculate the mod 10 of home and away scores to determine the winning square
+            let home_mod = quarter_scores.home.unwrap_or(0) % 10;
+            let away_mod = quarter_scores.away.unwrap_or(0) % 10;
+
+            // Find the owner of the square that matches the winning condition
+            let mut found_winner = false;
+            for square in &game.squares {
+                if square.home_team_index == home_mod && square.away_team_index == away_mod {
+                    // Update the winner for this quarter
+                    game.quarter_winners[quarter_index] = square.owner;
+                    found_winner = true;
+                    break; // Assuming only one winner per quarter
+                }
+            }
+
+            // If no winner is found for a square, it means the scores were not set for this quarter
+            if !found_winner {
+                break; // Stop processing further quarters if no scores are available for the current one
+            }
+        } else {
+            // No scores available for this quarter, stop processing further
+            break;
+        }
+    }
+
+    matches!(last_scored_quarter, Some(4))
 }
